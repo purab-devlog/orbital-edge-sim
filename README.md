@@ -1,8 +1,6 @@
 # Orbital Edge Intelligence Simulator
 
 ![Status](https://img.shields.io/badge/Status-Live-brightgreen?style=flat-square)
-![Track](https://img.shields.io/badge/Track-Real--Time%20Voice%20%26%20Conversational%20AI-orange?style=flat-square)
-![Hackathon](https://img.shields.io/badge/Hackathon-YC%20x%20Moss%20Builder%20Sprint-6C3FC4?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
 A full-stack simulation of an **autonomous orbital edge inference pipeline** — from a power-and-thermally-constrained satellite GPU, through a 9.6 kbps RF downlink bottleneck, to a zero-cloud vernacular voice alert at a remote ground outpost.
