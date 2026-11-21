@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sarvam Orbital Edge Simulator</title>
+<style>
+:root {
+  --bg:        #0a0e1a;
+  --bg2:       #111827;
+  --bg3:       #1a2235;
+  --border:    #1e3a5f;
+  --accent:    #00d4ff;
+  --accent2:   #7c3aed;
+  --green:     #22c55e;
+  --yellow:    #eab308;
+  --red:       #ef4444;
+  --orange:    #f97316;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --panel-pad: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 12px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ── */
+#topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+#topbar h1 { font-size: 13px; color: var(--accent); letter-spacing: 0.08em; font-weight: 700; }
+.status-pill {
+  font-size: 11px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid; letter-spacing: 0.05em;
+}
+.pill-green  { color: var(--green);  border-color: var(--green); }
+.pill-yellow { color: var(--yellow); border-color: var(--yellow); }
+.pill-red    { color: var(--red);    border-color: var(--red); }
+.pill-blue   { color: var(--accent); border-color: var(--accent); }
+.pill-muted  { color: var(--muted);  border-color: var(--muted); }
+#topbar .spacer { flex: 1; }
+#tick-counter { color: var(--muted); font-size: 11px; }
+
+/* ── Controls row ── */
+#controls {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+#controls label { color: var(--muted); font-size: 11px; }
+#controls select, #controls input[type=text] {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); padding: 3px 8px; border-radius: 4px;
+  font-family: inherit; font-size: 11px;
+}
+#controls button {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--accent); padding: 3px 12px; border-radius: 4px;
+  cursor: pointer; font-family: inherit; font-size: 11px;
+  transition: border-color 0.15s;
+}
+#controls button:hover { border-color: var(--accent); }
+#backend-label { color: var(--muted); font-size: 11px; }
+
+/* ── Main 4-panel grid ── */
+#grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 1px;
+  background: var(--border);
+  flex: 1;
+  overflow: hidden;
+}
+.panel {
+  background: var(--bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.panel-header {
+  background: var(--bg2);
+  padding: 6px var(--panel-pad);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.panel-body {
+  padding: var(--panel-pad);
+  overflow-y: auto;
+  flex: 1;
+}
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: var(--bg); }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Gauges ── */
+.gauge-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.gauge-label { color: var(--muted); width: 90px; flex-shrink: 0; font-size: 11px; }
+.gauge-track {
+  flex: 1; height: 8px; background: var(--bg3);
+  border-radius: 4px; overflow: hidden; position: relative;
+}
+.gauge-fill {
+  height: 100%; border-radius: 4px;
+  transition: width 0.3s ease, background 0.3s;
+}
+.gauge-val { width: 60px; text-align: right; font-size: 11px; }
+
+/* ── Orbit canvas ── */
+#orbit-canvas {
+  width: 100%; aspect-ratio: 1;
+  max-height: 200px;
+  display: block;
+}
+
+/* ── RF bottleneck visual ── */
+.rf-comparison {
+  margin: 10px 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.rf-row-label {
+  font-size: 10px; color: var(--muted); margin-bottom: 2px;
+}
+.rf-track {
+  height: 20px; background: var(--bg3); border-radius: 3px;
+  overflow: hidden; position: relative;
+  border: 1px solid var(--border);
+}
+.rf-fill-semantic {
+  height: 100%; background: var(--accent);
+  display: flex; align-items: center; padding-left: 6px;
+  font-size: 10px; color: var(--bg); font-weight: 700;
+  transition: width 0.3s ease;
+  white-space: nowrap; min-width: 0;
+}
+.rf-fill-raw {
+  height: 100%; background: var(--muted);
+  display: flex; align-items: center; padding-left: 6px;
+  font-size: 10px; color: var(--bg);
+  transition: width 0.3s ease;
+  white-space: nowrap; min-width: 0;
+}
+.rf-stall-label {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 10px;
+}
+
+/* ── Stat rows ── */
+.stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; border-bottom: 1px solid var(--bg3);
+  font-size: 11px;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-key { color: var(--muted); }
+.stat-val { font-weight: 600; }
+.val-green  { color: var(--green); }
+.val-yellow { color: var(--yellow); }
+.val-red    { color: var(--red); }
+.val-blue   { color: var(--accent); }
+.val-orange { color: var(--orange); }
+
+/* ── Alert box ── */
+#alert-box {
+  margin-top: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 80px;
+}
+#alert-event {
+  font-size: 13px; font-weight: 700; margin-bottom: 4px;
+}
+#alert-text {
+  color: var(--text); line-height: 1.6; font-size: 12px;
+}
+#alert-meta {
+  margin-top: 6px; color: var(--muted); font-size: 10px;
+}
+.alert-flash {
+  animation: flash 0.6s ease;
+}
+@keyframes flash {
+  0%   { border-color: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  100% { border-color: var(--border); box-shadow: none; }
+}
+
+/* ── Decision log ── */
+#decision-log {
+  font-size: 11px; line-height: 1.8;
+}
+.log-entry {
+  display: flex; gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--bg3);
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.log-t { color: var(--muted); flex-shrink: 0; width: 46px; }
+.log-msg { color: var(--text); }
+.log-msg.warn  { color: var(--yellow); }
+.log-msg.error { color: var(--red); }
+.log-msg.ok    { color: var(--green); }
+.log-msg.info  { color: var(--accent); }
+
+/* ── Event badge ── */
+.event-badge {
+  display: inline-block;
+  padding: 1px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+}
+.badge-WILDFIRE      { background: #7f1d1d; color: #fca5a5; }
+.badge-PIPELINE_LEAK { background: #1e3a5f; color: #93c5fd; }
+.badge-CROP_STRESS   { background: #14532d; color: #86efac; }
+.badge-FLOOD         { background: #1e3a8a; color: #a5b4fc; }
+.badge-CLEAR         { background: var(--bg3); color: var(--muted); }
+
+/* ── Map pin area ── */
+#map-container {
+  margin-top: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+#map-pins { font-size: 11px; }
+.map-pin-row {
+  display: flex; gap: 8px; align-items: center;
+  padding: 3px 0;
+}
+.pin-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-WILDFIRE      { background: #ef4444; }
+.dot-PIPELINE_LEAK { background: #3b82f6; }
+.dot-CROP_STRESS   { background: #22c55e; }
+.dot-FLOOD         { background: #818cf8; }
+
+/* ── Section divider ── */
+.section-title {
+  color: var(--muted); font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin: 10px 0 6px;
+}
+
+/* ── Tooltip ── */
+.tt { position: relative; cursor: help; }
+.tt:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 4px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); padding: 4px 8px; border-radius: 4px;
+  font-size: 10px; white-space: nowrap; z-index: 100;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div id="topbar">
+  <h1>⬡ SARVAM ORBITAL EDGE SIMULATOR</h1>
+  <span id="pill-sun"  class="status-pill pill-muted">ECLIPSE</span>
+  <span id="pill-pass" class="status-pill pill-muted">NO PASS</span>
+  <span id="pill-pgate" class="status-pill pill-muted">PWR: —</span>
+  <span id="pill-tgate" class="status-pill pill-muted">THERMAL: —</span>
+  <span id="pill-backend" class="status-pill pill-muted">TTS: —</span>
+  <div class="spacer"></div>
+  <span id="tick-counter">t=0  |  0s simulated</span>
+</div>
+
+<!-- ── Controls ── -->
+<div id="controls">
+  <label>Language:</label>
+  <select id="lang-select" onchange="setLanguage(this.value)">
+    <option value="en-IN">English (en-IN)</option>
+    <option value="kn-IN">Kannada (kn-IN)</option>
+    <option value="hi-IN">Hindi (hi-IN)</option>
+  </select>
+  <label>Bulbul Key:</label>
+  <input type="text" id="api-key-input" placeholder="sk-... (optional)" style="width:200px;">
+  <button onclick="setApiKey()">Set Key</button>
+  <button onclick="resetSim()">↺ Reset</button>
+  <span id="backend-label">Backend: browser TTS (fallback)</span>
+</div>
+
+<!-- ── 4-panel grid ── -->
+<div id="grid">
+
+  <!-- Panel 1: Orbital Node -->
+  <div class="panel">
+    <div class="panel-header">① ORBITAL NODE — POWER & THERMAL</div>
+    <div class="panel-body">
+
+      <canvas id="orbit-canvas" width="260" height="180"></canvas>
+
+      <div class="section-title">Power Budget</div>
+      <div class="gauge-row">
+        <span class="gauge-label tt" data-tip="Battery state of charge">Battery SoC</span>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="g-soc" style="width:0%;background:var(--green)"></div>
+        </div>
+        <span class="gauge-val" id="v-soc">—</span>
+      </div>
+      <div class="gauge-row">
+        <span class="gauge-label tt" data-tip="Solar panel output (W)">Solar In</span>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="g-solar" style="width:0%;background:var(--yellow)"></div>
+        </div>
+        <span class="gauge-val" id="v-solar">—</span>
+      </div>
+      <div class="gauge-row">
+        <span class="gauge-label tt" data-tip="Total power draw (W)">Load</span>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="g-load" style="width:0%;background:var(--orange)"></div>
+        </div>
+        <span class="gauge-val" id="v-load">—</span>
+      </div>
+
+      <div class="section-title">Thermal</div>
+      <div class="gauge-row">
+        <span class="gauge-label tt" data-tip="GPU junction temperature (°C)">GPU Temp</span>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="g-temp" style="width:0%;background:var(--green)"></div>
+        </div>
+        <span class="gauge-val" id="v-temp">—</span>
+      </div>
+      <div class="gauge-row">
+        <span class="gauge-label tt" data-tip="Heat rejected by radiator (W)">Q rejected</span>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="g-qrej" style="width:0%;background:var(--accent)"></div>
+        </div>
+        <span class="gauge-val" id="v-qrej">—</span>
+      </div>
+
+      <div class="section-title">Scheduler</div>
+      <div class="stat-row">
+        <span class="stat-key">Power gate</span>
+        <span class="stat-val" id="s-pgate">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Thermal gate</span>
+        <span class="stat-val" id="s-tgate">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Energy</span>
+        <span class="stat-val" id="s-energy">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Net power</span>
+        <span class="stat-val" id="s-pnet">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 2: RF Bottleneck -->
+  <div class="panel">
+    <div class="panel-header">② RF BOTTLENECK — 9.6 kbps DOWNLINK</div>
+    <div class="panel-body">
+
+      <div class="section-title">Link State</div>
+      <div class="stat-row">
+        <span class="stat-key">Elevation</span>
+        <span class="stat-val" id="s-elev">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Pass window</span>
+        <span class="stat-val" id="s-pass">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Window elapsed</span>
+        <span class="stat-val" id="s-winelapsed">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Queue depth</span>
+        <span class="stat-val" id="s-queue">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Last TX</span>
+        <span class="stat-val" id="s-txstatus">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">TX time</span>
+        <span class="stat-val" id="s-txtime">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Attempts</span>
+        <span class="stat-val" id="s-txattempts">—</span>
+      </div>
+
+      <div class="section-title">Compression Contrast</div>
+      <div class="rf-comparison">
+        <div>
+          <div class="rf-row-label">Semantic packet (~170 B) — clears in &lt;0.15 s</div>
+          <div class="rf-track">
+            <div class="rf-fill-semantic" id="rf-sem-bar" style="width:0%">
+              <span id="rf-sem-label"></span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="rf-row-label">Raw 50 MB tile — stalled at <span id="rf-raw-pct-label">0.000%</span></div>
+          <div class="rf-track">
+            <div class="rf-fill-raw" id="rf-raw-bar" style="width:0%">
+              <span id="rf-raw-label"></span>
+            </div>
+            <span class="rf-stall-label" id="rf-stall-msg">▶ stalled</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Sensor & Anomaly</div>
+      <div class="stat-row">
+        <span class="stat-key">Anomaly score</span>
+        <span class="stat-val" id="s-anomaly">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Detected class</span>
+        <span class="stat-val" id="s-class">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Inference</span>
+        <span class="stat-val" id="s-inf">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Confidence</span>
+        <span class="stat-val" id="s-conf">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Packet size</span>
+        <span class="stat-val" id="s-pktsize">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Compression</span>
+        <span class="stat-val" id="s-compress">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Radiation</span>
+        <span class="stat-val" id="s-rad">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 3: Ground Outpost -->
+  <div class="panel">
+    <div class="panel-header">③ GROUND OUTPOST — VERNACULAR DISPATCH</div>
+    <div class="panel-body">
+
+      <div class="section-title">Last Alert</div>
+      <div id="alert-box">
+        <div id="alert-event"><span class="event-badge badge-CLEAR">AWAITING SIGNAL</span></div>
+        <div id="alert-text" style="color:var(--muted);margin-top:6px;">
+          No packets received yet. Waiting for RF pass window…
+        </div>
+        <div id="alert-meta"></div>
+      </div>
+
+      <div class="section-title" style="margin-top:14px;">Event Map Pins</div>
+      <div id="map-container">
+        <div id="map-pins">
+          <span style="color:var(--muted)">No events confirmed yet.</span>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:14px;">Delivery Stats</div>
+      <div class="stat-row">
+        <span class="stat-key">Total alerts</span>
+        <span class="stat-val val-green" id="s-alerts">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Backend</span>
+        <span class="stat-val val-blue" id="s-backend">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Last language</span>
+        <span class="stat-val" id="s-lang">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Packets received</span>
+        <span class="stat-val" id="s-pkts-rcvd">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-key">Packets dropped</span>
+        <span class="stat-val val-red" id="s-pkts-drop">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Decision Log -->
+  <div class="panel">
+    <div class="panel-header">④ DECISION LOG — SCHEDULER TRACE</div>
+    <div class="panel-body" id="log-panel">
+      <div id="decision-log">
+        <div class="log-entry">
+          <span class="log-t">t=—</span>
+          <span class="log-msg info">Waiting for simulation…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let ws = null;
+let alertCount   = 0;
+let pktsReceived = 0;
+let pktsDropped  = 0;
+let mapPins      = [];
+let semFlash     = false;
+let cfg          = {};
+const MAX_LOG    = 120;
+
+// ── WebSocket ──────────────────────────────────────────────────────────────────
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onclose   = () => setTimeout(connect, 1500);
+  ws.onerror   = () => ws.close();
+}
+
+function wsSend(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+// ── Message handler ────────────────────────────────────────────────────────────
+function handle(msg) {
+  if      (msg.type === 'tick')   onTick(msg);
+  else if (msg.type === 'alert')  onAlert(msg);
+  else if (msg.type === 'log')    onLog(msg);
+  else if (msg.type === 'reset')  onReset();
+  else if (msg.type === 'config') onConfig(msg);
+}
+
+// ── Tick handler ───────────────────────────────────────────────────────────────
+function onTick(d) {
+  cfg = d;
+
+  // Top bar pills
+  setSunPill(d.sun_state);
+  setPassPill(d.pass_open, d.elevation_deg);
+  setGatePill('pill-pgate', d.power_gate, 'PWR');
+  setGatePill('pill-tgate', d.thermal_gate, 'THERM');
+
+  // Tick counter
+  $('tick-counter').textContent = `t=${d.t}  |  ${(d.t*30/60).toFixed(1)}min simulated`;
+
+  // ── Panel 1: Power & Thermal ──
+  const socPct = d.soc * 100;
+  setGauge('g-soc', 'v-soc', socPct, 100,
+           socPct < 20 ? 'var(--red)' : socPct < 35 ? 'var(--yellow)' : 'var(--green)',
+           socPct.toFixed(1) + '%');
+  setGauge('g-solar', 'v-solar', d.p_solar_w, 120, 'var(--yellow)', d.p_solar_w.toFixed(1)+'W');
+  setGauge('g-load',  'v-load',  d.p_load_w,  90,  'var(--orange)', d.p_load_w.toFixed(1)+'W');
+
+  const tempMax = 100;
+  const tempPct = Math.max(0, (d.gpu_temp_c + 30)) / (tempMax + 30) * 100;
+  const tempCol = d.gpu_temp_c >= 85 ? 'var(--red)'
+                : d.gpu_temp_c >= 75 ? 'var(--orange)'
+                : d.gpu_temp_c >= 50 ? 'var(--yellow)' : 'var(--green)';
+  setGauge('g-temp', 'v-temp', tempPct, 100, tempCol, d.gpu_temp_c.toFixed(1)+'°C');
+  setGauge('g-qrej', 'v-qrej', d.q_rej_w, 80, 'var(--accent)', d.q_rej_w.toFixed(1)+'W');
+
+  $('s-pgate').textContent  = d.power_gate;
+  $('s-pgate').className    = 'stat-val ' + gateColor(d.power_gate);
+  $('s-tgate').textContent  = d.thermal_gate;
+  $('s-tgate').className    = 'stat-val ' + gateColor(d.thermal_gate);
+  $('s-energy').textContent = d.energy_wh.toFixed(2) + ' Wh / ' + d.battery_cap_wh + ' Wh';
+  const netCol = d.p_net_w >= 0 ? 'val-green' : 'val-red';
+  $('s-pnet').textContent = (d.p_net_w >= 0 ? '+' : '') + d.p_net_w.toFixed(1) + ' W';
+  $('s-pnet').className = 'stat-val ' + netCol;
+
+  // Draw orbital canvas
+  drawOrbit(d);
+
+  // ── Panel 2: RF & Sensor ──
+  $('s-elev').textContent = d.elevation_deg.toFixed(1) + '°';
+  $('s-elev').className   = 'stat-val ' + (d.rf_pass_open ? 'val-green' : 'val-muted');
+  $('s-pass').textContent = d.rf_pass_open ? `●OPEN (pass #${d.rf_pass_number})` : '— CLOSED';
+  $('s-pass').className   = 'stat-val ' + (d.rf_pass_open ? 'val-green' : 'val-red');
+  $('s-winelapsed').textContent = d.rf_window_s > 0 ? d.rf_window_s.toFixed(0)+'s' : '—';
+  $('s-queue').textContent = d.rf_queue_depth;
+  $('s-queue').className   = 'stat-val ' + (d.rf_queue_depth > 10 ? 'val-yellow' : 'val-green');
+
+  if (d.rf_tx_status) {
+    const txCol = d.rf_tx_status === 'SUCCESS' ? 'val-green'
+                : d.rf_tx_status === 'DROPPED' ? 'val-red' : 'val-yellow';
+    $('s-txstatus').textContent = d.rf_tx_status;
+    $('s-txstatus').className   = 'stat-val ' + txCol;
+    $('s-txtime').textContent   = d.rf_tx_time_s > 0 ? d.rf_tx_time_s.toFixed(4)+'s' : '—';
+    $('s-txattempts').textContent = d.rf_tx_attempts + (d.rf_tx_attempts > 1 ? ' (retransmit)' : '');
+    $('s-txattempts').className   = 'stat-val ' + (d.rf_tx_attempts > 1 ? 'val-yellow' : 'val-green');
+    // Only count semantic packets (label doesn't start with "50 MB")
+    const isSemantic = d.rf_tx_label && !d.rf_tx_label.startsWith('50 MB');
+    if (d.rf_tx_status === 'SUCCESS' && isSemantic) {
+      pktsReceived++;
+      $('s-pkts-rcvd').textContent = pktsReceived;
+      flashSemanticBar(d.rf_tx_bytes, d.rf_tx_time_s);
+    } else if (isSemantic && (d.rf_tx_status === 'DROPPED' || d.rf_tx_status === 'MAX_RETRY')) {
+      pktsDropped++;
+      $('s-pkts-drop').textContent = pktsDropped;
+    }
+  }
+
+  // RF comparison bars
+  // Semantic: show 100% when a packet just cleared, else 0%
+  const rawPct = d.rf_raw_pct;
+  $('rf-raw-pct-label').textContent = rawPct.toFixed(4) + '%';
+  const rawBarW = Math.min(99, rawPct);
+  $('rf-raw-bar').style.width = rawBarW + '%';
+  $('rf-raw-label').textContent = rawBarW < 5 ? '' : rawPct.toFixed(3)+'%';
+  $('rf-stall-msg').textContent = rawPct < 0.5 ? '▶ stalled' : '▸ crawling';
+
+  // Sensor
+  const scoreCol = d.anomaly_score >= 0.55 ? 'val-orange' : 'val-green';
+  $('s-anomaly').textContent = d.anomaly_score.toFixed(4);
+  $('s-anomaly').className   = 'stat-val ' + scoreCol;
+  $('s-class').innerHTML     = `<span class="event-badge badge-${d.event_class}">${d.event_class}</span>`;
+  $('s-inf').textContent     = d.inference_ran ? '✓ RAN' : (d.anomaly_score >= 0.55 ? 'DENIED' : '—');
+  $('s-inf').className       = 'stat-val ' + (d.inference_ran ? 'val-green' : d.anomaly_score >= 0.55 ? 'val-red' : '');
+  $('s-conf').textContent    = d.confidence > 0 ? (d.confidence * 100).toFixed(1)+'%' : '—';
+  if (d.pkt_meta) {
+    $('s-pktsize').textContent = d.pkt_meta.byte_count + ' bytes';
+    $('s-pktsize').className   = 'stat-val val-blue';
+    $('s-compress').textContent = d.pkt_meta.compression_ratio.toLocaleString() + '×';
+    $('s-compress').className   = 'stat-val val-green';
+  }
+  $('s-rad').textContent = d.radiation_event ? '⚡ BIT FLIP' : '—';
+  $('s-rad').className   = 'stat-val ' + (d.radiation_event ? 'val-red' : '');
+}
+
+// ── Alert handler ──────────────────────────────────────────────────────────────
+function onAlert(msg) {
+  alertCount++;
+  $('s-alerts').textContent   = alertCount;
+  $('s-backend').textContent  = msg.backend;
+  $('s-lang').textContent     = msg.language_name + ' (' + msg.language + ')';
+
+  const ev  = msg.packet ? msg.packet.event_class : 'UNKNOWN';
+  const box = $('alert-box');
+
+  $('alert-event').innerHTML = `<span class="event-badge badge-${ev}">${ev}</span>
+    <span style="margin-left:8px;color:var(--muted);font-size:11px;">
+      conf=${(msg.packet.confidence*100).toFixed(0)}%  
+      via ${msg.backend === 'bulbul' ? '🔊 Bulbul' : '🔉 Browser TTS'}
+    </span>`;
+  $('alert-text').textContent = msg.alert_text;
+  $('alert-meta').textContent = `lat=${msg.packet.latitude.toFixed(4)}  lon=${msg.packet.longitude.toFixed(4)}  t=${msg.tick*30}s`;
+
+  box.classList.remove('alert-flash');
+  void box.offsetWidth;
+  box.classList.add('alert-flash');
+
+  // Map pin
+  addMapPin(ev, msg.packet.latitude, msg.packet.longitude, msg.packet.confidence);
+
+  // Browser TTS
+  if (msg.backend === 'browser_tts' && msg.alert_text) {
+    speakAlert(msg.alert_text, msg.language);
+  } else if (msg.audio_b64) {
+    playAudio(msg.audio_b64);
+  }
+}
+
+// ── Log handler ────────────────────────────────────────────────────────────────
+function onLog(msg) {
+  const log  = $('decision-log');
+  const text = msg.msg;
+  const cls  = text.includes('denied') || text.includes('drop') || text.includes('corrupt') ? 'error'
+             : text.includes('approved') || text.includes('delivered') || text.includes('alert generated') ? 'ok'
+             : text.includes('Anomaly') || text.includes('queued') || text.includes('pass open') ? 'info'
+             : text.includes('⚡') ? 'warn'
+             : '';
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-t">t=${msg.t}</span><span class="log-msg ${cls}">${text}</span>`;
+  log.prepend(entry);
+  while (log.children.length > MAX_LOG) log.removeChild(log.lastChild);
+}
+
+function onReset() {
+  alertCount = pktsReceived = pktsDropped = 0;
+  mapPins = [];
+  $('s-alerts').textContent = '0';
+  $('s-pkts-rcvd').textContent = '0';
+  $('s-pkts-drop').textContent = '0';
+  $('decision-log').innerHTML = '<div class="log-entry"><span class="log-t">t=0</span><span class="log-msg info">Simulation reset.</span></div>';
+  $('alert-text').textContent = 'No packets received yet. Waiting for RF pass window…';
+  $('alert-event').innerHTML = '<span class="event-badge badge-CLEAR">AWAITING SIGNAL</span>';
+  $('alert-meta').textContent = '';
+  $('map-pins').innerHTML = '<span style="color:var(--muted)">No events confirmed yet.</span>';
+  $('rf-sem-bar').style.width = '0%';
+  $('rf-raw-bar').style.width = '0%';
+}
+
+function onConfig(msg) {
+  const label = msg.backend === 'bulbul'
+    ? '🔊 Bulbul API (connected)'
+    : '🔉 Browser TTS (fallback)';
+  $('backend-label').textContent = 'Backend: ' + label;
+  $('pill-backend').textContent  = msg.backend === 'bulbul' ? 'TTS: BULBUL' : 'TTS: BROWSER';
+  $('pill-backend').className    = 'status-pill ' + (msg.backend === 'bulbul' ? 'pill-green' : 'pill-muted');
+}
+
+// ── Orbital canvas ─────────────────────────────────────────────────────────────
+let orbitHistory = [];
+function drawOrbit(d) {
+  const canvas = document.getElementById('orbit-canvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+  const earthR = 32, orbitR = 70;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Earth
+  const earthGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, earthR);
+  earthGrad.addColorStop(0, '#1e3a8a');
+  earthGrad.addColorStop(1, '#0f172a');
+  ctx.beginPath(); ctx.arc(cx, cy, earthR, 0, Math.PI*2);
+  ctx.fillStyle = earthGrad; ctx.fill();
+  ctx.strokeStyle = '#1e40af'; ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Orbit ring
+  ctx.beginPath(); ctx.arc(cx, cy, orbitR, 0, Math.PI*2);
+  ctx.strokeStyle = '#1e3a5f'; ctx.lineWidth = 1; ctx.setLineDash([3,4]);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Eclipse shadow (semi-circle on anti-sun side)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, orbitR + 10, Math.PI/2, 3*Math.PI/2);
+  ctx.lineTo(cx, cy - orbitR - 10);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+  ctx.restore();
+
+  // Ground station (Bengaluru — fixed dot on Earth surface)
+  const gsAngle = Math.PI * 0.15;   // approx lat/lon position on this schematic
+  const gsx = cx + Math.cos(gsAngle) * (earthR * 0.9);
+  const gsy = cy + Math.sin(gsAngle) * (earthR * 0.9);
+  ctx.beginPath(); ctx.arc(gsx, gsy, 3, 0, Math.PI*2);
+  ctx.fillStyle = '#22c55e'; ctx.fill();
+  ctx.font = '8px monospace'; ctx.fillStyle = '#22c55e';
+  ctx.fillText('BLR', gsx+4, gsy+3);
+
+  // Orbit trail
+  orbitHistory.push({t: d.t, pos: d.pos_km});
+  if (orbitHistory.length > 60) orbitHistory.shift();
+
+  // Satellite position (map ECI x,y → canvas)
+  const [px, py] = eciToCanvas(d.pos_km, cx, cy, orbitR);
+
+  // Draw trail
+  if (orbitHistory.length > 1) {
+    ctx.beginPath();
+    for (let i = 0; i < orbitHistory.length; i++) {
+      const [hx, hy] = eciToCanvas(orbitHistory[i].pos, cx, cy, orbitR);
+      if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+    }
+    ctx.strokeStyle = 'rgba(0,212,255,0.25)'; ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // LOS line to ground station (green if pass open)
+  if (d.pass_open) {
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(gsx, gsy);
+    ctx.strokeStyle = 'rgba(34,197,94,0.5)'; ctx.lineWidth = 1;
+    ctx.setLineDash([2,3]); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Satellite dot
+  const satCol = d.sun_state === 'SUNLIT' ? '#facc15' : '#94a3b8';
+  ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2);
+  ctx.fillStyle = satCol; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+
+  // Labels
+  ctx.font = '9px monospace'; ctx.fillStyle = '#64748b';
+  ctx.fillText(`alt ${d.altitude_km.toFixed(0)}km`, 4, H-4);
+  ctx.fillText(`elev ${d.elevation_deg.toFixed(1)}°`, W/2-20, H-4);
+  ctx.fillStyle = d.sun_state === 'SUNLIT' ? '#facc15' : '#475569';
+  ctx.fillText(d.sun_state, W-55, H-4);
+}
+
+function eciToCanvas(pos_km, cx, cy, orbitR) {
+  const [x, y] = [pos_km[0], pos_km[1]];
+  const r = Math.sqrt(x*x + y*y + pos_km[2]*pos_km[2]);
+  // Project onto XY plane for the schematic
+  const nx = x/r, ny = y/r;
+  return [cx + nx * orbitR, cy - ny * orbitR];
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function setGauge(barId, valId, pct, max, color, label) {
+  const w = Math.min(100, Math.max(0, pct / max * 100));
+  const bar = $(barId);
+  bar.style.width = w + '%';
+  bar.style.background = color;
+  $(valId).textContent = label;
+}
+
+function setSunPill(state) {
+  const p = $('pill-sun');
+  p.textContent = state;
+  p.className = 'status-pill ' + (state === 'SUNLIT' ? 'pill-yellow' : 'pill-muted');
+}
+
+function setPassPill(open, elev) {
+  const p = $('pill-pass');
+  p.textContent = open ? `PASS ●${elev.toFixed(1)}°` : 'NO PASS';
+  p.className = 'status-pill ' + (open ? 'pill-green' : 'pill-muted');
+}
+
+function setGatePill(id, gate, prefix) {
+  const p = $(id);
+  p.textContent = `${prefix}: ${gate}`;
+  p.className = 'status-pill ' + (gate === 'OPEN' ? 'pill-green'
+                                 : gate === 'THROTTLE' ? 'pill-yellow'
+                                 : gate === 'CUTOFF'   ? 'pill-red'
+                                 : gate === 'RESERVE'  ? 'pill-red'
+                                 : 'pill-muted');
+}
+
+function gateColor(gate) {
+  return gate === 'OPEN'     ? 'val-green'
+       : gate === 'THROTTLE' ? 'val-yellow'
+       : gate === 'CUTOFF'   ? 'val-red'
+       : gate === 'RESERVE'  ? 'val-red'
+       : gate === 'LOW_BATTERY' ? 'val-orange'
+       : gate === 'CHARGING_ONLY' ? 'val-yellow'
+       : '';
+}
+
+function flashSemanticBar(bytes, txTime) {
+  const bar   = $('rf-sem-bar');
+  const label = $('rf-sem-label');
+  bar.style.width = '100%';
+  label.textContent = `${bytes}B / ${txTime.toFixed(4)}s`;
+  setTimeout(() => {
+    bar.style.width = '0%';
+    label.textContent = '';
+  }, 800);
+}
+
+function addMapPin(ev, lat, lon, conf) {
+  mapPins.push({ev, lat, lon, conf});
+  if (mapPins.length > 10) mapPins.shift();
+  const container = $('map-pins');
+  container.innerHTML = mapPins.map(p => `
+    <div class="map-pin-row">
+      <div class="pin-dot dot-${p.ev}"></div>
+      <span class="event-badge badge-${p.ev}">${p.ev}</span>
+      <span style="color:var(--muted)">lat=${p.lat.toFixed(2)} lon=${p.lon.toFixed(2)}</span>
+      <span style="color:var(--green)">${(p.conf*100).toFixed(0)}%</span>
+    </div>`).join('');
+}
+
+// ── TTS ────────────────────────────────────────────────────────────────────────
+function speakAlert(text, lang) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utt  = new SpeechSynthesisUtterance(text);
+  utt.lang   = lang;
+  utt.rate   = 0.95;
+  // Prefer local voice — check localService
+  const voices = window.speechSynthesis.getVoices();
+  const local  = voices.find(v => v.lang === lang && v.localService);
+  const any    = voices.find(v => v.lang === lang);
+  if (local)       utt.voice = local;
+  else if (any)    utt.voice = any;
+  window.speechSynthesis.speak(utt);
+}
+
+function playAudio(b64) {
+  const binary = atob(b64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], {type: 'audio/wav'});
+  const url  = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.play().catch(() => {});
+  audio.onended = () => URL.revokeObjectURL(url);
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────────
+function setApiKey() {
+  const key = $('api-key-input').value.trim();
+  wsSend({type: 'set_key', key});
+  fetch('/api/key', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({key})
+  }).then(r => r.json()).then(d => {
+    $('backend-label').textContent = 'Backend: ' + (d.backend === 'bulbul' ? '🔊 Bulbul API' : '🔉 Browser TTS');
+  });
+}
+
+function setLanguage(lang) {
+  wsSend({type: 'set_language', language: lang});
+  fetch('/api/language', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({language: lang})
+  });
+}
+
+function resetSim() {
+  fetch('/api/reset', {method:'POST'});
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+connect();
+// Pre-load voices
+if (window.speechSynthesis) window.speechSynthesis.getVoices();
+</script>
+</body>
+</html>

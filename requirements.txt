@@ -1,0 +1,21 @@
+# Sarvam Orbital Edge Simulator — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Orbital mechanics (must install from GitHub — PyPI version uses removed `imp` module)
+# pip install "git+https://github.com/poliastro/poliastro.git@main"
+# (listed separately because pip -r doesn't support git+ with editable installs cleanly)
+
+# Web server
+flask==3.0.3
+flask-sock==0.7.0
+
+# Environment variable loading
+python-dotenv==1.0.1
+
+# Scientific stack (pinned by poliastro@main)
+astropy==5.3.4
+numpy==1.26.4
+scipy>=1.10.0
+
+# Poliastro deps
+numba>=0.57.0
